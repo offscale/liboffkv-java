@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>main</artifactId>
+        <groupId>io.offscale.liboffkv</groupId>
+        <version>1.0-SNAPSHOT</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>native</artifactId>
+
+    <build>
+        <plugins>
+            <plugin>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.7.0</version>
+                <configuration>
+                    <compilerArgs>
+                        <arg>-h</arg>
+                        <arg>src/cpp/generated</arg>
+                    </compilerArgs>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>com.googlecode.cmake-maven-project</groupId>
+                <artifactId>cmake-maven-plugin</artifactId>
+                <version>3.14.5-b1</version>
+                <executions>
+                    <execution>
+                        <id>cmake-generate</id>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <sourcePath>${basedir}/src/cpp/</sourcePath>
+                            <targetPath>${basedir}/target/${platform}-${build.type}/cpp/</targetPath>
+                            <config>${build.type}</config>
+                            <classifier>${cmake.classifier}</classifier>
+                            <options>
+                                <option>-DCMAKE_TOOLCHAIN_FILE=${cmake.toolchain}</option>
+                                <option>-DBUILD_TESTS=OFF</option>
+                            </options>
+                        </configuration>
+                    </execution>
+
+                    <execution>
+                        <id>compile</id>
+                        <goals>
+                            <goal>compile</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <!-- Optional: the build "target" -->
+                            </target>
+                            <projectDirectory>${basedir}/target/${platform}-${build.type}/cpp/</projectDirectory>
+                            <classifier>${cmake.classifier}</classifier>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>create-native-jar</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                        <configuration>
+                            <classifier>${platform}</classifier>
+                            <classesDirectory>${basedir}/target/${platform}-${build.type}/cpp/</classesDirectory>
+                            <includes>
+                                <!-- windows -->
+                                <include>*.dll</include>
+                                <include>*.pdb</include>
+                                <!-- linux -->
+                                <include>*.so</include>
+                                <!-- mac -->
+                                <include>*.dylib</include>
+                            </includes>
+                            <outputDirectory>${basedir}/target/${platform}-${build.type}/</outputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

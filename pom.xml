@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>io.offscale.liboffkv</groupId>
+    <artifactId>main</artifactId>
+    <packaging>pom</packaging>
+    <version>1.0-SNAPSHOT</version>
+
+<!--    <repositories>-->
+<!--        <repository>-->
+<!--            <id>jitpack.io</id>-->
+<!--            <url>https://jitpack.io</url>-->
+<!--        </repository>-->
+<!--    </repositories>-->
+
+    <properties>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+    </properties>
+
+    <modules>
+        <module>java</module>
+        <module>native</module>
+    </modules>
+
+    <profiles>
+        <profile>
+            <id>windows-x86_64-release</id>
+            <activation>
+                <os>
+                    <family>windows</family>
+                    <arch>amd64</arch>
+                </os>
+            </activation>
+            <properties>
+                <platform>windows-x86_64</platform>
+                <cmake.classifier>windows-x86_64</cmake.classifier>
+                <build.type>Release</build.type>
+            </properties>
+        </profile>
+        <profile>
+            <id>linux-x86_64-debug</id>
+            <properties>
+                <platform>linux-x86_64</platform>
+                <cmake.classifier>linux-x86_64</cmake.classifier>
+                <build.type>Debug</build.type>
+            </properties>
+        </profile>
+        <profile>
+            <id>linux-x86_64-release</id>
+            <activation>
+                <os>
+                    <family>linux</family>
+                    <arch>amd64</arch>
+                </os>
+            </activation>
+            <properties>
+                <platform>linux-x86_64</platform>
+                <cmake.classifier>linux-x86_64</cmake.classifier>
+                <build.type>Release</build.type>
+            </properties>
+        </profile>
+        <profile>
+            <id>mac-x86_64-debug</id>
+            <properties>
+                <platform>mac-x86_64</platform>
+                <cmake.classifier>mac-x86_64</cmake.classifier>
+                <build.type>Debug</build.type>
+            </properties>
+        </profile>
+        <profile>
+            <id>mac-x86_64-release</id>
+            <activation>
+                <os>
+                    <family>mac</family>
+                    <arch>x86_64</arch>
+                </os>
+            </activation>
+            <properties>
+                <platform>mac-x86_64</platform>
+                <cmake.classifier>mac-x86_64</cmake.classifier>
+                <build.type>Release</build.type>
+            </properties>
+        </profile>
+    </profiles>
+</project>
