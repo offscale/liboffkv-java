@@ -16,7 +16,9 @@ public class OffkvTest {
 
     @Test
     public void createDestroy() throws OffkvException {
-        System.out.println(address);
+        try (OffkvClient client = new OffkvClient(address, "")) {
+
+        }
     }
 
     @Parameterized.Parameters

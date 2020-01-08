@@ -12,17 +12,49 @@
     <artifactId>native</artifactId>
 
     <build>
+        <resources>
+            <resource>
+                <directory>${basedir}/target/${platform}-${build.type}/cpp/</directory>
+                <includes>
+                    <!-- windows -->
+                    <include>*.dll</include>
+                    <include>*.pdb</include>
+                    <!-- linux -->
+                    <include>*.so</include>
+                    <!-- mac -->
+                    <include>*.dylib</include>
+                </includes>
+            </resource>
+        </resources>
+
         <plugins>
+            <plugin>
+                <artifactId>maven-clean-plugin</artifactId>
+                <version>3.1.0</version>
+                <configuration>
+                    <filesets>
+                        <fileset>
+                            <directory>${basedir}/src/main/cpp/generated</directory>
+                            <includes>
+                                <include>**</include>
+                            </includes>
+                            <followSymlinks>false</followSymlinks>
+                        </fileset>
+                    </filesets>
+                </configuration>
+            </plugin>
+
             <plugin>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.7.0</version>
                 <configuration>
                     <compilerArgs>
                         <arg>-h</arg>
-                        <arg>src/cpp/generated</arg>
+                        <arg>${basedir}/src/main/cpp/generated</arg>
                     </compilerArgs>
                 </configuration>
             </plugin>
+
             <plugin>
                 <groupId>com.googlecode.cmake-maven-project</groupId>
                 <artifactId>cmake-maven-plugin</artifactId>
@@ -33,8 +65,9 @@
                         <goals>
                             <goal>generate</goal>
                         </goals>
+                        <phase>compile</phase>
                         <configuration>
-                            <sourcePath>${basedir}/src/cpp/</sourcePath>
+                            <sourcePath>${basedir}/src/main/cpp/</sourcePath>
                             <targetPath>${basedir}/target/${platform}-${build.type}/cpp/</targetPath>
                             <config>${build.type}</config>
                             <classifier>${cmake.classifier}</classifier>
@@ -47,43 +80,28 @@
 
                     <execution>
                         <id>compile</id>
+                        <phase>compile</phase>
                         <goals>
                             <goal>compile</goal>
                         </goals>
                         <configuration>
-                            <target>
-                                <!-- Optional: the build "target" -->
-                            </target>
                             <projectDirectory>${basedir}/target/${platform}-${build.type}/cpp/</projectDirectory>
                             <classifier>${cmake.classifier}</classifier>
                         </configuration>
                     </execution>
                 </executions>
             </plugin>
+
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jar-plugin</artifactId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.1.0</version>
                 <executions>
                     <execution>
-                        <id>create-native-jar</id>
-                        <phase>package</phase>
+                        <id>process-resources</id>
+                        <phase>process-classes</phase>
                         <goals>
-                            <goal>jar</goal>
+                            <goal>resources</goal>
                         </goals>
-                        <configuration>
-                            <classifier>${platform}</classifier>
-                            <classesDirectory>${basedir}/target/${platform}-${build.type}/cpp/</classesDirectory>
-                            <includes>
-                                <!-- windows -->
-                                <include>*.dll</include>
-                                <include>*.pdb</include>
-                                <!-- linux -->
-                                <include>*.so</include>
-                                <!-- mac -->
-                                <include>*.dylib</include>
-                            </includes>
-                            <outputDirectory>${basedir}/target/${platform}-${build.type}/</outputDirectory>
-                        </configuration>
                     </execution>
                 </executions>
             </plugin>
