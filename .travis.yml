@@ -45,11 +45,11 @@ matrix:
     #     - PREFERED_ARCHIVE_EXTENSION=zip
 
 before_install:
+  - chmod ug+x $TRAVIS_BUILD_DIR/travis/*.sh
   - eval "${MATRIX_EVAL}"
   - eval "$OSX_ENABLE_GCC"
 
 before_script:
-  - chmod ug+x $TRAVIS_BUILD_DIR/travis/*.sh
   - $TRAVIS_BUILD_DIR/travis/prepare_vcpkg.sh "$HOME/vcpkg/" "${VCPKG_BOOT_EVAL}"
   - cp -r "$TRAVIS_BUILD_DIR/native/src/main/cpp/liboffkv/vcpkg/ports" "$HOME/vcpkg/"
   - cd "$HOME/vcpkg"

@@ -69,10 +69,10 @@
                         <configuration>
                             <sourcePath>${basedir}/src/main/cpp/</sourcePath>
                             <targetPath>${basedir}/target/${platform}-${build.type}/cpp/</targetPath>
-                            <config>${build.type}</config>
                             <classifier>${cmake.classifier}</classifier>
                             <options>
                                 <option>-DCMAKE_TOOLCHAIN_FILE=${cmake.toolchain}</option>
+                                <option>-DCMAKE_BUILD_TYPE=${build.type}</option>
                                 <option>-DBUILD_TESTS=OFF</option>
                             </options>
                         </configuration>
