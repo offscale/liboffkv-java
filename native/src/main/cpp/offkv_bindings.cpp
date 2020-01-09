@@ -1,89 +1,18 @@
+#include "jni_utils.hpp"
 #include "generated/io_offscale_liboffkv_NativeClient.h"
+
 #include <liboffkv/liboffkv.hpp>
 #include <string>
 
-class JString {
-private:
-    JNIEnv* env;
-    jstring string;
-    const char* c_str = nullptr;
-
-public:
-    JString(JNIEnv* env, jstring string)
-        : env(env), string(string) {}
-
-    operator const char*() {
-        if (c_str == nullptr) {
-            c_str = env->GetStringUTFChars(string, nullptr);
-        }
-        return c_str;
-    }
-
-    operator std::string() {
-        return static_cast<const char*>(*this);
-    }
-
-    ~JString() {
-        if (c_str != nullptr) {
-            env->ReleaseStringUTFChars(string, c_str);
-            c_str = nullptr;
-        }
-    }
-};
-
-class JBytes {
-private:
-    JNIEnv* env;
-    jbyteArray bytes;
-    jbyte* c_bytes = nullptr;
-
-private:
-    char* get_bytes() {
-        if (c_bytes == nullptr) {
-            c_bytes = env->GetByteArrayElements(bytes, nullptr);
-        }
-        return reinterpret_cast<char*>(c_bytes);
-    }
-
-public:
-    JBytes(JNIEnv* env, jbyteArray bytes)
-        : env(env), bytes(bytes) {}
-
-    operator std::string() {
-        return std::string(get_bytes(), env->GetArrayLength(bytes));
-    }
-
-    ~JBytes() {
-        if (c_bytes != nullptr) {
-            env->ReleaseByteArrayElements(bytes, c_bytes, JNI_ABORT);
-            c_bytes = nullptr;
-        }
-    }
-};
-
-static jbyteArray to_java_bytes(JNIEnv* env, const std::string& data) {
-    jbyteArray result = env->NewByteArray(data.size());
-    void* rawdata = env->GetPrimitiveArrayCritical(result, nullptr);
-    std::copy(data.begin(), data.end(), reinterpret_cast<jchar*>(rawdata));
-    env->ReleasePrimitiveArrayCritical(result, rawdata, JNI_COMMIT);
-    return result;
-}
-
-static jstring to_java_string(JNIEnv* env, const std::string& data) {
-    return env->NewStringUTF(data.c_str());
-}
 
 static liboffkv::Client& unwrap(jlong handle) {
     return *reinterpret_cast<liboffkv::Client*>(handle);
 }
 
 static jobject make_result(JNIEnv* env, jlong version, jobject value, liboffkv::WatchHandle* watch) {
-    jclass clazz = env->FindClass("io/offscale/liboffkv/ResultHandle");
+    auto [clazz, constructor] =
+    prepare_construction(env, "io/offscale/liboffkv/ResultHandle", "(JLjava/lang/Object;J)V");
     if (!clazz)
-        return nullptr;
-
-    jmethodID constructor = env->GetMethodID(clazz, "<init>", "(JLjava/lang/Object;J)V");
-    if (!constructor)
         return nullptr;
 
     return env->NewObject(clazz, constructor, version, value, reinterpret_cast<jlong>(watch));
@@ -114,6 +43,22 @@ static jobject convert_result(JNIEnv* env, liboffkv::ChildrenResult&& result) {
     return make_result(env, 0, children, result.watch.release());
 }
 
+using OffkvExceptionMapper = ExceptionMapper<
+        decltype("io/offscale/liboffkv/ServiceException"_cexpr),
+        liboffkv::Error,
+        ExceptionMapping<liboffkv::NoEntry, decltype("io/offscale/liboffkv/KeyNotFoundException"_cexpr)>,
+        ExceptionMapping<liboffkv::NoChildrenForEphemeral, decltype("io/offscale/liboffkv/NoChildrenForEphemeralException"_cexpr)>,
+        ExceptionMapping<liboffkv::EntryExists, decltype("io/offscale/liboffkv/KeyAlreadyExistsException"_cexpr)>,
+        ExceptionMapping<liboffkv::ConnectionLoss, decltype("io/offscale/liboffkv/ConnectionLostException"_cexpr)>,
+        ExceptionMapping<liboffkv::InvalidKey, decltype("io/offscale/liboffkv/InvalidKeyException"_cexpr)>,
+        ExceptionMapping<liboffkv::InvalidAddress, decltype("io/offscale/liboffkv/InvalidAddressException"_cexpr)>,
+        ExceptionMapping<liboffkv::ServiceError, decltype("io/offscale/liboffkv/ServiceException"_cexpr)>
+    >;
+
+#define OFFKV_RAISE_L(env, exc) OffkvExceptionMapper::raise(env, exc); return 0;
+#define OFFKV_RAISE_O(env, exc) OffkvExceptionMapper::raise(env, exc); return nullptr;
+#define OFFKV_RAISE_V(env, exc) OffkvExceptionMapper::raise(env, exc); return;
+
 /*
  * Class:     io_offscale_liboffkv_NativeClient
  * Method:    connect
@@ -121,9 +66,12 @@ static jobject convert_result(JNIEnv* env, liboffkv::ChildrenResult&& result) {
  */
 JNIEXPORT jlong JNICALL Java_io_offscale_liboffkv_NativeClient_connect(
     JNIEnv* env, jobject self, jstring url, jstring prefix) {
-    // TODO: add error handling
-    liboffkv::Client* client = liboffkv::open(JString{env, url}, JString{env, prefix}).release();
-    return reinterpret_cast<jlong>(client);
+    try {
+        liboffkv::Client* client = liboffkv::open(JString{env, url}, JString{env, prefix}).release();
+        return reinterpret_cast<jlong>(client);
+    } catch (liboffkv::Error& error) {
+        OFFKV_RAISE_L(env, error)
+    }
 }
 
 /*
@@ -133,8 +81,11 @@ JNIEXPORT jlong JNICALL Java_io_offscale_liboffkv_NativeClient_connect(
  */
 JNIEXPORT jlong JNICALL Java_io_offscale_liboffkv_NativeClient_create(
     JNIEnv* env, jobject self, jlong handle, jstring key, jbyteArray value, jboolean lease) {
-    // TODO: add error handling
-    return unwrap(handle).create(JString{env, key}, JBytes{env, value}, lease);
+    try {
+        return unwrap(handle).create(JString{env, key}, JBytes{env, value}, lease);
+    } catch (liboffkv::Error& error) {
+        OFFKV_RAISE_L(env, error)
+    }
 }
 
 /*
@@ -144,8 +95,11 @@ JNIEXPORT jlong JNICALL Java_io_offscale_liboffkv_NativeClient_create(
  */
 JNIEXPORT void JNICALL Java_io_offscale_liboffkv_NativeClient_delete
     (JNIEnv* env, jobject self, jlong handle, jstring key, jlong version) {
-    // TODO: add error handling
-    unwrap(handle).erase(JString{env, key}, version);
+    try {
+        unwrap(handle).erase(JString{env, key}, version);
+    } catch (liboffkv::Error& error) {
+        OFFKV_RAISE_V(env, error)
+    }
 }
 
 /*
@@ -165,9 +119,12 @@ JNIEXPORT void JNICALL Java_io_offscale_liboffkv_NativeClient_free(
  */
 JNIEXPORT jobject JNICALL Java_io_offscale_liboffkv_NativeClient_exists(
     JNIEnv* env, jobject self, jlong handle, jstring key, jboolean watch) {
-    // TODO: add error handling
-    liboffkv::ExistsResult result = unwrap(handle).exists(JString{env, key}, watch);
-    return convert_result(env, std::move(result));
+    try {
+        liboffkv::ExistsResult result = unwrap(handle).exists(JString{env, key}, watch);
+        return convert_result(env, std::move(result));
+    } catch (liboffkv::Error& error) {
+        OFFKV_RAISE_O(env, error)
+    }
 }
 
 /*
@@ -177,9 +134,12 @@ JNIEXPORT jobject JNICALL Java_io_offscale_liboffkv_NativeClient_exists(
  */
 JNIEXPORT jobject JNICALL Java_io_offscale_liboffkv_NativeClient_get(
     JNIEnv* env, jobject self, jlong handle, jstring key, jboolean watch) {
-    // TODO: add error handling
-    liboffkv::GetResult result = unwrap(handle).get(JString{env, key}, watch);
-    return convert_result(env, std::move(result));
+    try {
+        liboffkv::GetResult result = unwrap(handle).get(JString{env, key}, watch);
+        return convert_result(env, std::move(result));
+    } catch (liboffkv::Error& error) {
+        OFFKV_RAISE_O(env, error)
+    }
 }
 
 /*
@@ -189,9 +149,12 @@ JNIEXPORT jobject JNICALL Java_io_offscale_liboffkv_NativeClient_get(
  */
 JNIEXPORT jobject JNICALL Java_io_offscale_liboffkv_NativeClient_getChildren(
     JNIEnv* env, jobject self, jlong handle, jstring key, jboolean watch) {
-    // TODO: add error handling
-    liboffkv::ChildrenResult result = unwrap(handle).get_children(JString{env, key}, watch);
-    return convert_result(env, std::move(result));
+    try {
+        liboffkv::ChildrenResult result = unwrap(handle).get_children(JString{env, key}, watch);
+        return convert_result(env, std::move(result));
+    } catch (liboffkv::Error& error) {
+        OFFKV_RAISE_O(env, error)
+    }
 }
 
 /*
@@ -201,9 +164,12 @@ JNIEXPORT jobject JNICALL Java_io_offscale_liboffkv_NativeClient_getChildren(
  */
 JNIEXPORT jlong JNICALL Java_io_offscale_liboffkv_NativeClient_compareAndSet(
     JNIEnv* env, jobject self, jlong handle, jstring key, jbyteArray data, jlong version) {
-    // TODO: add error handling
-    liboffkv::CasResult result = unwrap(handle).cas(JString{env, key}, JBytes{env, data}, version);
-    return result.version;
+    try {
+        liboffkv::CasResult result = unwrap(handle).cas(JString{env, key}, JBytes{env, data}, version);
+        return result.version;
+    } catch (liboffkv::Error& error) {
+        OFFKV_RAISE_L(env, error)
+    }
 }
 
 /*
@@ -213,8 +179,11 @@ JNIEXPORT jlong JNICALL Java_io_offscale_liboffkv_NativeClient_compareAndSet(
  */
 JNIEXPORT jlong JNICALL Java_io_offscale_liboffkv_NativeClient_set(
     JNIEnv* env, jobject self, jlong handle, jstring key, jbyteArray data) {
-    // TODO: add error handling
-    return unwrap(handle).set(JString{env, key}, JBytes{env, data});
+    try {
+        return unwrap(handle).set(JString{env, key}, JBytes{env, data});
+    } catch (liboffkv::Error& error) {
+        OFFKV_RAISE_L(env, error)
+    }
 }
 
 /*
@@ -224,8 +193,11 @@ JNIEXPORT jlong JNICALL Java_io_offscale_liboffkv_NativeClient_set(
  */
 JNIEXPORT void JNICALL Java_io_offscale_liboffkv_NativeClient_waitChanges(
     JNIEnv* env, jobject self, jlong watch_handle) {
-    // TODO: add error handling
-    reinterpret_cast<liboffkv::WatchHandle*>(watch_handle)->wait();
+    try {
+        reinterpret_cast<liboffkv::WatchHandle*>(watch_handle)->wait();
+    } catch (liboffkv::Error& error) {
+        OFFKV_RAISE_V(env, error)
+    }
 }
 
 /*

@@ -2,17 +2,22 @@ package io.offscale.liboffkv;
 
 public class WatchableResult implements AutoCloseable {
     private final NativeClient backend = NativeClient.getInstance();
-    private final long watchHandle;
+    private long watchHandle;
 
     protected WatchableResult(long watchHandle) {
         this.watchHandle = watchHandle;
     }
 
-    public void waitChanges() {
+    public void waitChanges() throws OffkvException {
         if (!isWatchable())
             throw new IllegalStateException("Result is not watchable");
 
-        backend.waitChanges(watchHandle);
+        try {
+            backend.waitChanges(watchHandle);
+        } finally {
+            close();
+            watchHandle = 0;
+        }
     }
 
     public boolean isWatchable() {
