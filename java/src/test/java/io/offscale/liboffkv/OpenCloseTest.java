@@ -5,7 +5,6 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import java.net.URISyntaxException;
-import java.util.Arrays;
 
 @RunWith(Parameterized.class)
 public class OpenCloseTest {
@@ -37,10 +36,6 @@ public class OpenCloseTest {
 
     @Parameterized.Parameters
     public static Iterable<String> serviceAddresses() {
-        return Arrays.asList(
-                "etcd://localhost:2379",
-                "consul://localhost:8500",
-                "zk://localhost:2181"
-        );
+        return OffkvTestBase.serviceAddresses();
     }
 }

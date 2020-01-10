@@ -1,6 +1,6 @@
 package io.offscale.liboffkv;
 
-import org.junit.After;
+import io.offscale.liboffkv.test.Ensure;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -8,39 +8,20 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import java.net.URISyntaxException;
-import java.util.*;
-import java.util.logging.Logger;
+import java.util.Arrays;
+import java.util.Collections;
 
 @RunWith(Parameterized.class)
-public class OffkvTest {
-    private final Random random = new Random();
-    private final Logger logger = Logger.getLogger("test");
-
-    private final String address;
-    private final Set<String> usedKeys = new HashSet<>();
+public class BasicTest extends OffkvTestBase {
     private OffkvClient client;
 
-    public OffkvTest(String addr) {
-        address = addr;
-        logger.info("Run with address: " + addr);
+    public BasicTest(String addr) {
+        super(addr);
     }
 
     @Before
     public void initClient() throws URISyntaxException, OffkvException {
-        client = new OffkvClient(address, "/unitTests");
-    }
-
-    @After
-    public void destroyClient() throws OffkvException {
-        for (String key : usedKeys) {
-            try {
-                client.delete(key);
-            } catch (KeyNotFoundException ignored) {
-            } catch (OffkvException exc) {
-                exc.printStackTrace();
-            }
-        }
-        client.close();
+        client = newClient();
     }
 
     @Test
@@ -77,6 +58,7 @@ public class OffkvTest {
 
         Assert.assertTrue(exists.exists());
         Assert.assertEquals(v, exists.getVersion());
+        Ensure.threw(exists::waitChanges, IllegalStateException.class);
     }
 
     @Test
@@ -90,10 +72,11 @@ public class OffkvTest {
 
         Assert.assertEquals(v, get.getVersion());
         Assert.assertArrayEquals(data, get.getValue());
+        Ensure.threw(get::waitChanges, IllegalStateException.class);
     }
 
     @Test
-    public void createTest() throws OffkvException {
+    public void create() throws OffkvException {
         use("/key");
 
         client.create("/key", getSomeData());
@@ -178,6 +161,7 @@ public class OffkvTest {
 
         result = client.getChildren("/key/child");
         Ensure.equalsAsSets(Collections.singletonList("/key/child/grandchild"), result.getChildren());
+        Ensure.threw(result::waitChanges, IllegalStateException.class);
     }
 
     @Test(expected = KeyNotFoundException.class)
@@ -223,19 +207,8 @@ public class OffkvTest {
         Assert.assertArrayEquals(val, client.get("/key").getValue());
     }
 
-    private byte[] getSomeData() {
-        byte[] data = new byte[128]; // TODO: increase size
-        random.nextBytes(data);
-        return data;
-    }
-
-    private String use(String key) {
-        usedKeys.add(key);
-        return key;
-    }
-
     @Parameterized.Parameters
     public static Iterable<String> serviceAddresses() {
-        return OpenCloseTest.serviceAddresses();
+        return OffkvTestBase.serviceAddresses();
     }
 }

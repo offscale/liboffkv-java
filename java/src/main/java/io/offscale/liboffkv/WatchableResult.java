@@ -16,7 +16,6 @@ public class WatchableResult implements AutoCloseable {
             backend.waitChanges(watchHandle);
         } finally {
             close();
-            watchHandle = 0;
         }
     }
 
@@ -28,6 +27,7 @@ public class WatchableResult implements AutoCloseable {
     public void close() {
         if (isWatchable()) {
             backend.freeWatch(watchHandle);
+            watchHandle = 0;
         }
     }
 }

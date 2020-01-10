@@ -25,7 +25,6 @@ void init() {
     ::signal(SIGSEGV, &my_signal_handler);
     ::signal(SIGABRT, &my_signal_handler);
 }
-
 }
 #else
 namespace trace {

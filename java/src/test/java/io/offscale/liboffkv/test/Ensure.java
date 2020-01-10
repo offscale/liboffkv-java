@@ -1,4 +1,4 @@
-package io.offscale.liboffkv;
+package io.offscale.liboffkv.test;
 
 import junit.framework.AssertionFailedError;
 import org.junit.Assert;
