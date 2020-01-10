@@ -1,8 +1,40 @@
+#include "generated/config.hpp"
 #include "jni_utils.hpp"
 #include "generated/io_offscale_liboffkv_NativeClient.h"
 
 #include <liboffkv/liboffkv.hpp>
 #include <string>
+
+#ifdef ENABLE_TRACING
+#include <signal.h>
+#include <execinfo.h>
+
+namespace trace {
+void my_signal_handler(int signum) {
+    constexpr size_t N = 30;
+
+    void* array[N];
+    size_t size = backtrace(array, N);
+
+    fprintf(stderr, "Error: signal %d:\n", signum);
+    backtrace_symbols_fd(array, size, STDERR_FILENO);
+    exit(1);
+}
+
+void init() {
+    ::signal(SIGSEGV, &my_signal_handler);
+    ::signal(SIGABRT, &my_signal_handler);
+}
+
+}
+#else
+namespace trace {
+
+void init() {
+}
+
+}
+#endif
 
 
 static liboffkv::Client& unwrap(jlong handle) {
@@ -58,6 +90,12 @@ using OffkvExceptionMapper = ExceptionMapper<
 #define OFFKV_RAISE_L(env, exc) OffkvExceptionMapper::raise(env, exc); return 0;
 #define OFFKV_RAISE_O(env, exc) OffkvExceptionMapper::raise(env, exc); return nullptr;
 #define OFFKV_RAISE_V(env, exc) OffkvExceptionMapper::raise(env, exc); return;
+
+
+JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
+    trace::init();
+    return JNI_VERSION_1_2;
+}
 
 /*
  * Class:     io_offscale_liboffkv_NativeClient

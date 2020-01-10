@@ -2,6 +2,7 @@
 
 #include <string>
 #include <typeinfo>
+#include <algorithm>
 #include <jni.h>
 
 class JString {
@@ -66,7 +67,7 @@ public:
 jbyteArray to_java_bytes(JNIEnv* env, const std::string& data) {
     jbyteArray result = env->NewByteArray(data.size());
     void* rawdata = env->GetPrimitiveArrayCritical(result, nullptr);
-    std::copy(data.begin(), data.end(), reinterpret_cast<jchar*>(rawdata));
+    std::copy_n(data.data(), data.size(), reinterpret_cast<jbyte*>(rawdata));
     env->ReleasePrimitiveArrayCritical(result, rawdata, JNI_COMMIT);
     return result;
 }
