@@ -38,9 +38,9 @@ public class OpenCloseTest {
     @Parameterized.Parameters
     public static Iterable<String> serviceAddresses() {
         return Arrays.asList(
+                "etcd://localhost:2379",
                 "consul://localhost:8500",
-                "zk://localhost:2181",
-                "etcd://localhost:2379"
+                "zk://localhost:2181"
         );
     }
 }

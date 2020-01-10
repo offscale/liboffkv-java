@@ -51,7 +51,6 @@ public class OffkvClient implements Closeable {
         return get(key, false);
     }
 
-
     public long compareAndSet(String key, byte[] value, long version) throws OffkvException {
         return backend.compareAndSet(handle, key, value, version);
     }

@@ -11,16 +11,20 @@ import java.net.URISyntaxException;
 import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
+import java.util.logging.Logger;
 
 @RunWith(Parameterized.class)
 public class OffkvTest {
     private final Random random = new Random();
+    private final Logger logger = Logger.getLogger("test");
+
     private final String address;
     private final Set<String> usedKeys = new HashSet<>();
     private OffkvClient client;
 
     public OffkvTest(String addr) {
         address = addr;
+        logger.info("Run with address: " + addr);
     }
 
     @Before
@@ -31,7 +35,12 @@ public class OffkvTest {
     @After
     public void destroyClient() throws OffkvException {
         for (String key : usedKeys) {
-            client.delete(key);
+            try {
+                client.delete(key);
+            } catch (KeyNotFoundException ignored) {
+            } catch (OffkvException exc) {
+                exc.printStackTrace();
+            }
         }
         client.close();
     }
@@ -40,24 +49,24 @@ public class OffkvTest {
     public void createExists() throws OffkvException {
         Assert.assertFalse(client.exists("/test").exists());
         long v = client.create(use("/test"), getSomeData());
-
         ExistsResult exists = client.exists("/test");
+
         Assert.assertTrue(exists.exists());
-        Assert.assertEquals(exists.getVersion(), v);
+        Assert.assertEquals(v, exists.getVersion());
     }
 
     @Test
     public void createGet() throws OffkvException {
         byte[] data = getSomeData();
         long v = client.create(use("/test"), data);
-
         GetResult get = client.get("/test");
-        Assert.assertEquals(get.getVersion(), v);
-        Assert.assertArrayEquals(get.getValue(), data);
+
+        Assert.assertEquals(v, get.getVersion());
+        Assert.assertArrayEquals(data, get.getValue());
     }
 
     private byte[] getSomeData() {
-        byte[] data = new byte[1024];
+        byte[] data = new byte[128]; // TODO: increase size
         random.nextBytes(data);
         return data;
     }
