@@ -207,6 +207,114 @@ public class BasicTest extends OffkvTestBase {
         Assert.assertArrayEquals(val, client.get("/key").getValue());
     }
 
+    @Test
+    public void transactionInterfaceFailures() {
+        String key = "/key";
+        byte[] val = getSomeData();
+
+        Ensure.threw(() -> client.transaction().set(key, val).check(key, 1), IllegalStateException.class);
+        Ensure.threw(() -> client.transaction().create(key, val).check(key, 1), IllegalStateException.class);
+        Ensure.threw(() -> client.transaction().delete(key).check(key, 1), IllegalStateException.class);
+    }
+
+    @Test
+    public void transactionSucceeded() throws OffkvException {
+        byte[] val = getSomeData();
+
+        long foo_version = client.create(use("/foo"), val);
+        long bar_version = client.create("/foo/bar", val);
+
+        TransactionResult result = client.transaction()
+                .check("/foo", foo_version)
+                .check("/foo/bar", bar_version)
+                .create("/foo/child", val)
+                .delete("/foo/bar")
+                .commit();
+
+        Assert.assertTrue(result.succeeded());
+        Assert.assertEquals(1, result.getOperationResults().size());
+        Assert.assertEquals(TransactionResult.OperationKind.CREATE, result.getOperationResults().get(0).kind);
+
+        Assert.assertTrue(client.exists("/foo/child").exists());
+        Assert.assertArrayEquals(val, client.get("/foo/child").getValue());
+        Assert.assertFalse(client.exists("/foo/bar").exists());
+    }
+
+    @Test
+    public void transactionCheckFailed() throws OffkvException {
+        byte[] val = getSomeData();
+        byte[] val2 = getSomeData();
+
+        long key_version = client.create(use("/key"), val);
+        long foo_version = client.create(use("/foo"), val);
+        long bar_version = client.create("/foo/bar", val);
+
+        TransactionResult result = client.transaction()
+                .check("/key", key_version)
+                .check("/foo", foo_version + 1)
+                .check("/foo/bar", bar_version)
+                .create("/key/child", val)
+                .set("/key", val2)
+                .delete("/foo")
+                .commit();
+
+        Assert.assertFalse(result.succeeded());
+        Assert.assertEquals(1, result.getFailedIndex());
+
+        Assert.assertFalse(client.exists("/key/child").exists());
+        Assert.assertArrayEquals(val, client.get("/key").getValue());
+        Assert.assertTrue(client.exists("/foo").exists());
+    }
+
+    // TODO: add leased transaction test
+
+    @Test
+    public void transactionNpe() {
+        TransactionBuilder builder = client.transaction();
+        byte[] val = getSomeData();
+
+        ensureNpe(() -> builder.check(null, 1));
+
+        ensureNpe(() -> builder.create(null, val));
+        ensureNpe(() -> builder.create("/key", null));
+
+        ensureNpe(() -> builder.set("/key", null));
+        ensureNpe(() -> builder.set(null, val));
+
+        ensureNpe(() -> builder.delete(null));
+    }
+
+    @Test
+    public void npe() {
+        use("/key");
+        byte[] val = getSomeData();
+
+        ensureNpe(() -> client.set("/key", null));
+        ensureNpe(() -> client.set(null, val));
+
+        ensureNpe(() -> client.create("/key", null));
+        ensureNpe(() -> client.create(null, val));
+
+        ensureNpe(() -> client.exists(null));
+        ensureNpe(() -> client.exists(null, true));
+
+        ensureNpe(() -> client.get(null));
+        ensureNpe(() -> client.get(null, true));
+
+        ensureNpe(() -> client.getChildren(null));
+        ensureNpe(() -> client.getChildren(null, true));
+
+        ensureNpe(() -> client.delete(null));
+
+        ensureNpe(() -> client.compareAndSet(null, val, 1));
+        ensureNpe(() -> client.compareAndSet("/key", null, 1));
+    }
+
+    private static void ensureNpe(Ensure.Func func) {
+        Ensure.threw(func, NullPointerException.class);
+    }
+
+
     @Parameterized.Parameters
     public static Iterable<String> serviceAddresses() {
         return OffkvTestBase.serviceAddresses();

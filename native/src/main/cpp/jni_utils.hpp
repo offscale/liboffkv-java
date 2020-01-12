@@ -3,7 +3,23 @@
 #include <string>
 #include <typeinfo>
 #include <algorithm>
+#include <stdexcept>
 #include <jni.h>
+
+
+template <char... chars>
+class ConstexprString {
+private:
+    static constexpr char str[sizeof...(chars) + 1] = { chars..., '\0' };
+
+public:
+    static constexpr const char* to_string() {
+        return str;
+    }
+};
+
+template <class Char, Char... chars>
+constexpr ConstexprString<chars...> operator"" _cexpr() { return {}; }
 
 class JString {
 private:
@@ -63,6 +79,75 @@ public:
         }
     }
 };
+
+template <class Val, class... Signature>
+class JFieldSignature;
+
+template<>
+class JFieldSignature<jlong> {
+public:
+    static constexpr const char* signature = "J";
+    static jlong get(JNIEnv* env, jobject obj, jfieldID field) {
+        return env->GetLongField(obj, field);
+    }
+};
+
+template<>
+class JFieldSignature<jint> {
+public:
+    static constexpr const char* signature = "I";
+    static jint get(JNIEnv* env, jobject obj, jfieldID field) {
+        return env->GetIntField(obj, field);
+    }
+};
+
+template<>
+class JFieldSignature<jboolean> {
+public:
+    static constexpr const char* signature = "Z";
+    static jboolean get(JNIEnv* env, jobject obj, jfieldID field) {
+        return env->GetIntField(obj, field);
+    }
+};
+
+template<class Signature>
+class JFieldSignature<jobject, Signature> {
+public:
+    static constexpr const char* signature = Signature::to_string();
+    static jobject get(JNIEnv* env, jobject obj, jfieldID field) {
+        return env->GetObjectField(obj, field);
+    }
+};
+
+template<>
+class JFieldSignature<jstring> {
+public:
+    static constexpr const char* signature = "Ljava/lang/String;";
+    static jstring get(JNIEnv* env, jobject obj, jfieldID field) {
+        return reinterpret_cast<jstring>(env->GetObjectField(obj, field));
+    }
+};
+
+template<>
+class JFieldSignature<jbyteArray> {
+public:
+    static constexpr const char* signature = "[B";
+    static jbyteArray get(JNIEnv* env, jobject obj, jfieldID field) {
+        return reinterpret_cast<jbyteArray>(env->GetObjectField(obj, field));
+    }
+};
+
+template <class Val, class... Signature>
+Val get_field_value(JNIEnv* env, jobject object, const char* name) {
+    using Sig = JFieldSignature<Val, Signature...>;
+
+    jclass clazz = env->GetObjectClass(object);
+    jfieldID field = env->GetFieldID(clazz, name, Sig::signature);
+    if (!field)
+        return Val{};
+
+    return Sig::get(env, object, field);
+}
 
 jbyteArray to_java_bytes(JNIEnv* env, const std::string& data) {
     jbyteArray result = env->NewByteArray(data.size());
@@ -132,25 +217,19 @@ void raise_exception(JNIEnv* env, const char* exception) {
     env->Throw(exc);
 }
 
-template <char... chars>
-class ConstexprString {
-private:
-    static constexpr char str[sizeof...(chars) + 1] = { chars..., '\0' };
-
+template <class CClass, class j_class>
+class ClassMapping {
 public:
-    static constexpr const char* to_string() {
-        return str;
-    }
+    using CppClass = CClass;
+    static constexpr const char* java_class = j_class::to_string();
 };
 
-template <class Char, Char... chars>
-constexpr ConstexprString<chars...> operator"" _cexpr() { return {}; }
-
-template <class SrcException, class exc_class>
-class ExceptionMapping {
+template <class ExcMapping>
+class ExceptionRaiser {
 public:
-    using SourceException = SrcException;
-    static constexpr const char* java_exception_class = exc_class::to_string();
+    static void raise(JNIEnv* env, const typename ExcMapping::CppClass& exc) {
+        raise_exception(env, ExcMapping::java_class, exc.what());
+    }
 };
 
 template <class default_exception_class, class ExcBase, class... Mappings>
@@ -160,7 +239,7 @@ template <class default_exception_class, class ExcBase>
 class ExceptionMapper<default_exception_class, ExcBase> {
 public:
     static void raise(JNIEnv* env, ExcBase& error) {
-        raise_exception(env, default_exception_class::to_string(), error.what());
+        ExceptionRaiser<ClassMapping<ExcBase, default_exception_class>>::raise(env, error);
     }
 };
 
@@ -179,8 +258,8 @@ private:
 
     static bool try_raise(JNIEnv* env, ExcBase& error) {
         try {
-            auto& cast_error = dynamic_cast<typename M0::SourceException&>(error);
-            raise_exception(env, M0::java_exception_class, cast_error.what());
+            auto& cast_error = dynamic_cast<typename M0::CppClass&>(error);
+            ExceptionRaiser<M0>::raise(env, cast_error);
             return true;
         } catch (std::bad_cast& miscast) {
             return false;

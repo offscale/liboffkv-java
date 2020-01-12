@@ -1,6 +1,7 @@
 #include "generated/config.hpp"
 #include "jni_utils.hpp"
 #include "generated/io_offscale_liboffkv_NativeClient.h"
+#include "offkvexcept.hpp"
 
 #include <liboffkv/liboffkv.hpp>
 #include <string>
@@ -74,21 +75,56 @@ static jobject convert_result(JNIEnv* env, liboffkv::ChildrenResult&& result) {
     return make_result(env, 0, children, result.watch.release());
 }
 
-using OffkvExceptionMapper = ExceptionMapper<
-        decltype("io/offscale/liboffkv/ServiceException"_cexpr),
-        liboffkv::Error,
-        ExceptionMapping<liboffkv::NoEntry, decltype("io/offscale/liboffkv/KeyNotFoundException"_cexpr)>,
-        ExceptionMapping<liboffkv::NoChildrenForEphemeral, decltype("io/offscale/liboffkv/NoChildrenForEphemeralException"_cexpr)>,
-        ExceptionMapping<liboffkv::EntryExists, decltype("io/offscale/liboffkv/KeyAlreadyExistsException"_cexpr)>,
-        ExceptionMapping<liboffkv::ConnectionLoss, decltype("io/offscale/liboffkv/ConnectionLostException"_cexpr)>,
-        ExceptionMapping<liboffkv::InvalidKey, decltype("io/offscale/liboffkv/InvalidKeyException"_cexpr)>,
-        ExceptionMapping<liboffkv::InvalidAddress, decltype("io/offscale/liboffkv/InvalidAddressException"_cexpr)>,
-        ExceptionMapping<liboffkv::ServiceError, decltype("io/offscale/liboffkv/ServiceException"_cexpr)>
-    >;
+static jlongArray convert_result(JNIEnv* env, liboffkv::TransactionResult&& result) {
+    jlongArray arr = env->NewLongArray(result.size());
+    if (!arr)
+        return nullptr;
 
-#define OFFKV_RAISE_L(env, exc) OffkvExceptionMapper::raise(env, exc); return 0;
-#define OFFKV_RAISE_O(env, exc) OffkvExceptionMapper::raise(env, exc); return nullptr;
-#define OFFKV_RAISE_V(env, exc) OffkvExceptionMapper::raise(env, exc); return;
+    jlong* elems = env->GetLongArrayElements(arr, nullptr);
+    if (!elems)
+        return nullptr;
+
+    jlong* elems_ptr = elems;
+    for (liboffkv::TxnOpResult op_result : result) {
+        *(elems_ptr++) = op_result.version;
+    }
+
+    env->ReleaseLongArrayElements(arr, elems, JNI_COMMIT);
+    return arr;
+}
+
+static liboffkv::TxnCheck convert_txn_check(JNIEnv* env, jobject check) {
+    auto key = get_field_value<jstring>(env, check, "key");
+    auto value = get_field_value<jlong>(env, check, "version");
+    return {JString{env, key}, value };
+}
+
+static liboffkv::TxnOp convert_txn_op(JNIEnv* env, jobject operation) {
+    auto kind = get_field_value<jint>(env, operation, "kind");
+    auto key = get_field_value<jstring>(env, operation, "key");
+    jbyteArray value;
+    jboolean lease;
+
+    switch (kind) {
+        case 0:
+            // SET
+            value = get_field_value<jbyteArray>(env, operation, "value");
+            return liboffkv::TxnOpSet(JString{env, key}, JBytes{env, value});
+
+        case 1:
+            // CREATE
+            value = get_field_value<jbyteArray>(env, operation, "value");
+            lease = get_field_value<jboolean>(env, operation, "leased");
+            return liboffkv::TxnOpCreate(JString{env, key}, JBytes{env, value}, lease);
+
+        case 2:
+            // DELETE
+            return liboffkv::TxnOpErase(JString{env, key});
+
+        default:
+            throw std::logic_error("Bad transaction operation");
+    }
+}
 
 
 JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
@@ -222,6 +258,41 @@ JNIEXPORT jlong JNICALL Java_io_offscale_liboffkv_NativeClient_set(
         OFFKV_RAISE_L(env, error)
     }
 }
+
+
+/*
+ * Class:     io_offscale_liboffkv_NativeClient
+ * Method:    commit
+ * Signature: (J[Lio/offscale/liboffkv/txn/TransactionCheck;[Lio/offscale/liboffkv/txn/TransactionOperation;)[J
+ */
+JNIEXPORT jlongArray JNICALL Java_io_offscale_liboffkv_NativeClient_commit(
+    JNIEnv* env, jobject self, jlong handle, jobjectArray checks, jobjectArray operations) {
+    size_t num_checks = env->GetArrayLength(checks);
+    size_t num_operations = env->GetArrayLength(operations);
+    liboffkv::Transaction txn;
+    txn.checks.reserve(num_checks);
+    txn.ops.reserve(num_operations);
+
+    for (size_t i = 0; i < num_checks; ++i) {
+        txn.checks.push_back(convert_txn_check(env, env->GetObjectArrayElement(checks, i)));
+    }
+    try {
+        for (size_t i = 0; i < num_operations; ++i) {
+            txn.ops.push_back(convert_txn_op(env, env->GetObjectArrayElement(operations, i)));
+        }
+    } catch (std::logic_error& err) {
+        raise_exception(env, "java/lang/IllegalArgumentException", err.what());
+        return nullptr;
+    }
+
+    try {
+        liboffkv::TransactionResult result = unwrap(handle).commit(txn);
+        return convert_result(env, std::move(result));
+    } catch (liboffkv::Error& exc) {
+        OFFKV_RAISE_O(env, exc);
+    }
+}
+
 
 /*
  * Class:     io_offscale_liboffkv_NativeClient

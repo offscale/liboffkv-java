@@ -2,7 +2,7 @@ package io.offscale.liboffkv;
 
 import java.io.*;
 
-public class LibraryLoader {
+class LibraryLoader {
     public static void load(String name) throws IOException {
         String filename = System.mapLibraryName(name);
         File file;

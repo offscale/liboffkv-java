@@ -4,9 +4,7 @@ import java.io.IOException;
 
 class NativeClient {
     private static class LazyHolder {
-
         static final NativeClient INSTANCE = new NativeClient();
-
     }
     public static NativeClient getInstance() {
         return LazyHolder.INSTANCE;
@@ -34,9 +32,11 @@ class NativeClient {
             throws OffkvException;
     public native void delete(long handle, String key, long version)
             throws OffkvException;
+    public native long[] commit(long handle, TransactionCheck[] checks, TransactionOperation[] operations)
+            throws OffkvException, TransactionFailedException;
 
     public native long connect(String url, String prefix)
-            throws OffkvException;
+            throws OffkvException, InvalidAddressException;
     public native void waitChanges(long watchHandle)
             throws OffkvException;
     public native void free(long handle);
