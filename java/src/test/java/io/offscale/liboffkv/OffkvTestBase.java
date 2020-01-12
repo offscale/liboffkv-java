@@ -29,7 +29,7 @@ public class OffkvTestBase {
         return client;
     }
 
-    protected synchronized void releaseClient(OffkvClient client) throws OffkvException {
+    protected synchronized void releaseClient(OffkvClient client) {
         client.close();
         clients.remove(client);
     }
@@ -52,11 +52,7 @@ public class OffkvTestBase {
         }
 
         for (OffkvClient cl : clients) {
-            try {
-                cl.close();
-            } catch (OffkvException exc) {
-                exc.printStackTrace();
-            }
+            cl.close();
         }
     }
 
