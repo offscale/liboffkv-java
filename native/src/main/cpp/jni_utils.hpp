@@ -217,18 +217,18 @@ void raise_exception(JNIEnv* env, const char* exception) {
     env->Throw(exc);
 }
 
-template <class CClass, class j_class>
+template <class CClass, class JClass>
 class ClassMapping {
 public:
     using CppClass = CClass;
-    static constexpr const char* java_class = j_class::to_string();
+    static constexpr const char* JavaClass = JClass::to_string();
 };
 
 template <class ExcMapping>
 class ExceptionRaiser {
 public:
     static void raise(JNIEnv* env, const typename ExcMapping::CppClass& exc) {
-        raise_exception(env, ExcMapping::java_class, exc.what());
+        raise_exception(env, ExcMapping::JavaClass, exc.what());
     }
 };
 
