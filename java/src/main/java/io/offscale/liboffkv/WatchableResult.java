@@ -1,10 +1,11 @@
 package io.offscale.liboffkv;
 
 public class WatchableResult implements AutoCloseable {
-    private final NativeClient backend = NativeClient.getInstance();
+    private final NativeClient backend;
     private long watchHandle;
 
-    protected WatchableResult(long watchHandle) {
+    protected WatchableResult(NativeClient backend, long watchHandle) {
+        this.backend = backend;
         this.watchHandle = watchHandle;
     }
 

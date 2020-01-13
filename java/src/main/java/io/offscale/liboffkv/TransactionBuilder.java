@@ -6,13 +6,14 @@ import java.util.Objects;
 import java.util.function.Supplier;
 
 public class TransactionBuilder {
-    private final NativeClient backend = NativeClient.getInstance();
+    private final NativeClient backend;
     private final List<TransactionCheck> checks = new ArrayList<>();
     private final List<TransactionOperation> operations = new ArrayList<>();
     private final Supplier<Long> handleSupplier;
     private boolean moreChecksExpected = true;
 
-    TransactionBuilder(Supplier<Long> handleSupplier) {
+    TransactionBuilder(NativeClient backend, Supplier<Long> handleSupplier) {
+        this.backend = backend;
         this.handleSupplier = handleSupplier;
     }
 

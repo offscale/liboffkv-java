@@ -3,13 +3,13 @@ package io.offscale.liboffkv;
 public class ExistsResult extends WatchableResult {
     private long version;
 
-    private ExistsResult(long version, long watchHandle) {
-        super(watchHandle);
+    private ExistsResult(NativeClient backend, long version, long watchHandle) {
+        super(backend, watchHandle);
         this.version = version;
     }
 
-    ExistsResult(ResultHandle<Void> nativeResult) {
-        this(nativeResult.version, nativeResult.watch);
+    ExistsResult(NativeClient backend, ResultHandle<Void> nativeResult) {
+        this(backend, nativeResult.version, nativeResult.watch);
     }
 
     public boolean exists() {

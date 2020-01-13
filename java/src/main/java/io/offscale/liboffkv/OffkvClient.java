@@ -4,7 +4,7 @@ import java.net.URISyntaxException;
 import java.util.Objects;
 
 public class OffkvClient implements AutoCloseable {
-    private final NativeClient backend = NativeClient.getInstance();
+    private final NativeClient backend = new NativeClient();
     private long handle;
 
     public OffkvClient(String url, String prefix) throws URISyntaxException, OffkvException {
@@ -24,7 +24,7 @@ public class OffkvClient implements AutoCloseable {
     }
 
     public ExistsResult exists(String key, boolean watch) throws OffkvException {
-        return new ExistsResult(backend.exists(handle, Objects.requireNonNull(key), watch));
+        return new ExistsResult(backend, backend.exists(handle, Objects.requireNonNull(key), watch));
     }
 
     public ExistsResult exists(String key) throws OffkvException {
@@ -32,7 +32,7 @@ public class OffkvClient implements AutoCloseable {
     }
 
     public ChildrenResult getChildren(String key, boolean watch) throws OffkvException {
-        return new ChildrenResult(backend.getChildren(handle, Objects.requireNonNull(key), watch));
+        return new ChildrenResult(backend, backend.getChildren(handle, Objects.requireNonNull(key), watch));
     }
 
     public ChildrenResult getChildren(String key) throws OffkvException {
@@ -44,7 +44,7 @@ public class OffkvClient implements AutoCloseable {
     }
 
     public GetResult get(String key, boolean watch) throws OffkvException {
-        return new GetResult(backend.get(handle, Objects.requireNonNull(key), watch));
+        return new GetResult(backend, backend.get(handle, Objects.requireNonNull(key), watch));
     }
 
     public GetResult get(String key) throws OffkvException {
@@ -65,7 +65,7 @@ public class OffkvClient implements AutoCloseable {
     }
 
     public TransactionBuilder transaction() {
-        return new TransactionBuilder(() -> {
+        return new TransactionBuilder(backend, () -> {
             checkState();
             return handle;
         });

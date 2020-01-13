@@ -7,13 +7,13 @@ import java.util.List;
 public class ChildrenResult extends WatchableResult {
     private List<String> children;
 
-    ChildrenResult(String[] children, long watchHandle) {
-        super(watchHandle);
+    ChildrenResult(NativeClient backend, String[] children, long watchHandle) {
+        super(backend, watchHandle);
         this.children = Collections.unmodifiableList(Arrays.asList(children));
     }
 
-    ChildrenResult(ResultHandle<String[]> nativeResult) {
-        this(nativeResult.value, nativeResult.watch);
+    ChildrenResult(NativeClient backend, ResultHandle<String[]> nativeResult) {
+        this(backend, nativeResult.value, nativeResult.watch);
     }
 
     public List<String> getChildren() {

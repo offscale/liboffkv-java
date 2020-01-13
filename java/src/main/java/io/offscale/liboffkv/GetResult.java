@@ -4,14 +4,14 @@ public class GetResult extends WatchableResult {
     private long version;
     private byte[] value;
 
-    GetResult(long version, byte[] value, long watchHandle) {
-        super(watchHandle);
+    GetResult(NativeClient backend, long version, byte[] value, long watchHandle) {
+        super(backend, watchHandle);
         this.version = version;
         this.value = value;
     }
 
-    GetResult(ResultHandle<byte[]> nativeResult) {
-        this(nativeResult.version, nativeResult.value, nativeResult.watch);
+    GetResult(NativeClient backend, ResultHandle<byte[]> nativeResult) {
+        this(backend, nativeResult.version, nativeResult.value, nativeResult.watch);
     }
 
     public long getVersion() {
