@@ -40,14 +40,13 @@ public class SequencedTest extends OffkvTestBase {
 
             Assert.assertTrue(result.exists());
             result.waitChanges();
+
+            flow.point(2);
+
             Assert.assertFalse(c.exists("/key").exists());
         });
 
-        thread(c -> {
-            flow.point(1);
-
-            c.delete("/key");
-        });
+        thread(constructDeleter("/key", flow, false));
 
         jointAll();
     }
@@ -69,15 +68,7 @@ public class SequencedTest extends OffkvTestBase {
             flow.point(2);
         });
 
-        thread(c -> {
-            flow.point(1);
-
-            Thread.sleep(10000);
-            Assert.assertEquals(0, flow.reached(2));
-            c.delete("/key");
-
-            flow.point(2);
-        });
+        thread(constructDeleter("/key", flow, true));
 
         jointAll();
     }
@@ -97,14 +88,13 @@ public class SequencedTest extends OffkvTestBase {
 
             Assert.assertArrayEquals(val, result.getValue());
             result.waitChanges();
+
+            flow.point(2);
+
             Assert.assertArrayEquals(val2, c.get("/key").getValue());
         });
 
-        thread((c) -> {
-            flow.point(1);
-
-            c.set("/key", val2);
-        });
+        thread(constructSetter("/key", val2, flow, false));
 
         jointAll();
     }
@@ -127,15 +117,7 @@ public class SequencedTest extends OffkvTestBase {
             flow.point(2);
         });
 
-        thread((c) -> {
-            flow.point(1);
-
-            Thread.sleep(10000);
-            Assert.assertEquals(0, flow.reached(2));
-            c.set("/key", val2);
-
-            flow.point(2);
-        });
+        thread(constructSetter("/key", val2, flow, true));
 
         jointAll();
     }
@@ -152,25 +134,48 @@ public class SequencedTest extends OffkvTestBase {
             c.create("/key/child/grandchild", val);
             c.create("/key/dimak24", val);
 
-            ChildrenResult result = newClient().getChildren("/key", true);
+            ChildrenResult result = c.getChildren("/key", true);
 
             flow.point(1);
 
             Ensure.equalsAsSets(Arrays.asList("/key/child", "/key/dimak24"), result.getChildren());
             result.waitChanges();
+
+            flow.point(2);
+
             Ensure.equalsAsSets(Collections.singletonList("/key/child"), c.getChildren("/key").getChildren());
         });
 
-        thread(c -> {
-            flow.point(1);
-
-            c.delete("/key/dimak24");
-        });
+        thread(constructDeleter("/key/dimak24", flow, false));
 
         jointAll();
     }
 
-    // TODO add getChildrenWatchUseful
+    @Test
+    public void getChildrenWatchUseful() throws ExecutionException {
+        use("/key");
+        CheckpointBarriers<Integer> flow = new CheckpointBarriers<>(2);
+        byte[] val = getSomeData();
+
+        thread(c -> {
+            c.create("/key", val);
+            c.create("/key/child", val);
+            c.create("/key/child/grandchild", val);
+            c.create("/key/dimak24", val);
+
+            ChildrenResult result = c.getChildren("/key", true);
+
+            flow.point(1);
+
+            result.waitChanges();
+
+            flow.point(2);
+        });
+
+        thread(constructDeleter("/key/dimak24", flow,true));
+
+        jointAll();
+    }
 
     @Test
     public void createLeased() throws ExecutionException {
@@ -209,6 +214,36 @@ public class SequencedTest extends OffkvTestBase {
     public void cleanThreads() {
         threads.clear();
         futures.clear();
+    }
+
+    private ThrowingConsumer<OffkvClient> constructDeleter(
+            String key, CheckpointBarriers<Integer> flow, boolean checkUsefulness) {
+        return c -> {
+            flow.point(1);
+
+            if (checkUsefulness) {
+                Thread.sleep(4000);
+                Assert.assertEquals(0, flow.reached(2));
+            }
+            c.delete(key);
+
+            flow.point(2);
+        };
+    }
+
+    private ThrowingConsumer<OffkvClient> constructSetter(
+            String key, byte[] value, CheckpointBarriers<Integer> flow, boolean checkUsefulness) {
+        return c -> {
+            flow.point(1);
+
+            if (checkUsefulness) {
+                Thread.sleep(4000);
+                Assert.assertEquals(0, flow.reached(2));
+            }
+            c.set(key, value);
+
+            flow.point(2);
+        };
     }
 
     private void jointAll() throws ExecutionException {
