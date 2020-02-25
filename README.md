@@ -1,6 +1,7 @@
 liboffkv-java
 ===========
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Build Status](https://travis-ci.org/offscale/liboffkv-java.svg?branch=master)](https://travis-ci.org/offscale/liboffkv-java)
 
 #### liboffkv-java is a wrapper around [liboffkv](https://github.com/offscale/liboffkv).
 
