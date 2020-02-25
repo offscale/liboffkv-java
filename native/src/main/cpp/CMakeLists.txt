@@ -9,6 +9,11 @@ if (CMAKE_BUILD_TYPE STREQUAL Debug)
 endif()
 configure_file(config.hpp.in generated/config.hpp @ONLY)
 
+if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    set(JAVA_AWT_LIBRARY NotNeeded)
+    set(JAVA_JVM_LIBRARY NotNeeded)
+endif()
+
 find_package(JNI REQUIRED)
 find_package(Threads REQUIRED)
 
@@ -16,6 +21,6 @@ add_subdirectory(liboffkv)
 
 add_library(offkv_java_bindings SHARED offkv_bindings.cpp)
 target_include_directories(offkv_java_bindings PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
-target_link_libraries(offkv_java_bindings PUBLIC ${JNI_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(offkv_java_bindings PUBLIC ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(offkv_java_bindings PUBLIC liboffkv)
 target_include_directories(offkv_java_bindings PUBLIC ${JNI_INCLUDE_DIRS})
