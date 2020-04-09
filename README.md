@@ -34,8 +34,27 @@ The library is currently tested on
     VS 2017 is known to fail.
 
   - [vcpkg](https://docs.microsoft.com/en-us/cpp/build/vcpkg)
-  - Maven
 
+  - Maven 3.6.1 or higher
+
+  - JDK 11
+
+    The library targets Java 1.8, but one of the maven plugins is compiled for Java 11.
+
+## Configure build system
+
+- Install [vcpkg](https://docs.microsoft.com/en-us/cpp/build/vcpkg)
+- Install Java 11 or higher
+- Install [maven](https://maven.apache.org/)
+- Install vcpkg packages `offscale-libetcd-cpp`, `zkpp`, `ppconsul`
+- Download submodules: `git submodule init && git submodule update`
+
+## Build and test
+
+```sh
+mvn test -Pvcpkg-cmake -Dcmake.toolchain="vcpkg-root/scripts/buildsystems/vcpkg.cmake"
+# where vcpkg-root is path to your vcpkg directory
+```
 
 ## License
 
